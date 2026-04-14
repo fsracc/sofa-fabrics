@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SOFA RE:FABRIC</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+JP:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0f0e0d;
+    --surface: #1a1917;
+    --surface2: #252320;
+    --border: #333129;
+    --accent: #c8a96e;
+    --accent2: #e8c98e;
+    --text: #e8e4dc;
+    --text-dim: #8a8070;
+    --danger: #c0522a;
+    --success: #5a8a5a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  header {
+    padding: 24px 40px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 20px;
+    background: var(--surface);
+  }
+
+  header h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.4rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+  }
+
+  header p {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+
+  .app-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr 260px;
+    height: calc(100vh - 73px);
+  }
+
+  /* ===== LEFT PANEL ===== */
+  .left-panel {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .panel-section {
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .upload-zone {
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+    padding: 20px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .upload-zone:hover {
+    border-color: var(--accent);
+    background: rgba(200,169,110,0.05);
+  }
+
+  .upload-zone.has-image {
+    border-style: solid;
+    border-color: var(--accent);
+    padding: 0;
+  }
+
+  .upload-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-zone .preview-thumb {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    display: block;
+    border-radius: 3px;
+  }
+
+  .upload-zone .upload-hint {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  .upload-zone .upload-icon {
+    font-size: 1.8rem;
+    margin-bottom: 8px;
+    display: block;
+    opacity: 0.5;
+  }
+
+  /* Tool buttons */
+  .tool-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .tool-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.15s;
+    width: 100%;
+    text-align: left;
+  }
+
+  .tool-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .tool-btn.active {
+    background: rgba(200,169,110,0.12);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .tool-btn.danger:hover, .tool-btn.danger.active {
+    border-color: var(--danger);
+    color: var(--danger);
+    background: rgba(192,82,42,0.1);
+  }
+
+  /* Slider */
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .slider-row label {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    min-width: 60px;
+  }
+
+  .slider-row input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent);
+  }
+
+  .slider-row span {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    min-width: 28px;
+    text-align: right;
+  }
+
+  /* Checkbox */
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+
+  .checkbox-row input {
+    accent-color: var(--accent);
+  }
+
+  /* ===== CANVAS AREA ===== */
+  .canvas-area {
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .canvas-wrapper {
+    position: relative;
+    box-shadow: 0 8px 48px rgba(0,0,0,0.6);
+  }
+
+  #mainCanvas {
+    display: block;
+    cursor: crosshair;
+  }
+
+  #overlayCanvas {
+    position: absolute;
+    top: 0; left: 0;
+    pointer-events: none;
+  }
+
+  .canvas-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: var(--text-dim);
+    text-align: center;
+    padding: 40px;
+  }
+
+  .canvas-placeholder .big-icon {
+    font-size: 4rem;
+    opacity: 0.2;
+  }
+
+  .canvas-placeholder p {
+    font-size: 0.85rem;
+    line-height: 1.7;
+  }
+
+  /* ===== RIGHT PANEL ===== */
+  .right-panel {
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .action-btn {
+    width: 100%;
+    padding: 13px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.05rem;
+    letter-spacing: 0.1em;
+    transition: all 0.2s;
+    margin-bottom: 8px;
+  }
+
+  .action-btn.primary {
+    background: var(--accent);
+    color: var(--bg);
+  }
+
+  .action-btn.primary:hover {
+    background: var(--accent2);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(200,169,110,0.3);
+  }
+
+  .action-btn.secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+
+  .action-btn.secondary:hover {
+    border-color: var(--text-dim);
+    color: var(--text);
+  }
+
+  .action-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .status-bar {
+    margin-top: auto;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+
+  .status-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  .status-dot.ready { background: var(--success); }
+  .status-dot.warn { background: var(--accent); }
+
+  /* Blend mode select */
+  select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    width: 100%;
+    cursor: pointer;
+  }
+
+  select:focus { outline: 1px solid var(--accent); }
+
+  /* Color picker row */
+  .color-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .color-row label { font-size: 0.72rem; color: var(--text-dim); flex: 1; }
+  .color-row input[type="color"] {
+    width: 36px; height: 28px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    background: none;
+    padding: 2px;
+  }
+
+  /* Step badge */
+  .step-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px; height: 20px;
+    background: var(--accent);
+    color: var(--bg);
+    border-radius: 50%;
+    font-size: 0.65rem;
+    font-weight: 700;
+    margin-right: 6px;
+    flex-shrink: 0;
+  }
+
+  .step-badge.dim { background: var(--border); color: var(--text-dim); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>SOFA RE:FABRIC</h1>
+  <p>ソファの張地シミュレーター — 無料・ブラウザのみ</p>
+</header>
+
+<div class="app-layout">
+
+  <!-- ===== LEFT PANEL ===== -->
+  <div class="left-panel">
+
+    <!-- Step 1: ソファ画像 -->
+    <div class="panel-section">
+      <div class="panel-label"><span class="step-badge">1</span>ソファ画像をアップロード</div>
+      <div class="upload-zone" id="sofaUploadZone">
+        <input type="file" id="sofaInput" accept="image/*">
+        <span class="upload-icon">🛋️</span>
+        <div class="upload-hint">クリックまたはドロップ<br>JPG / PNG</div>
+      </div>
+    </div>
+
+    <!-- Step 2: 張地画像 -->
+    <div class="panel-section">
+      <div class="panel-label"><span class="step-badge" id="step2badge">2</span>張地テクスチャをアップロード</div>
+      <div class="upload-zone" id="fabricUploadZone">
+        <input type="file" id="fabricInput" accept="image/*">
+        <span class="upload-icon">🪡</span>
+        <div class="upload-hint">クリックまたはドロップ<br>JPG / PNG</div>
+      </div>
+    </div>
+
+    <!-- Step 3: ツール -->
+    <div class="panel-section">
+      <div class="panel-label"><span class="step-badge dim" id="step3badge">3</span>マスクツール</div>
+      <div class="tool-group">
+        <button class="tool-btn active" id="btnBrush" onclick="setTool('brush')">
+          🖌️ ブラシ（塗りつぶし）
+        </button>
+        <button class="tool-btn" id="btnEraser" onclick="setTool('eraser')">
+          ⬜ 消しゴム
+        </button>
+        <button class="tool-btn danger" id="btnClear" onclick="clearMask()">
+          🗑️ マスクをリセット
+        </button>
+      </div>
+    </div>
+
+    <!-- ブラシ設定 -->
+    <div class="panel-section">
+      <div class="panel-label">ブラシ設定</div>
+      <div class="slider-row">
+        <label>サイズ</label>
+        <input type="range" id="brushSize" min="5" max="120" value="40" oninput="updateBrush()">
+        <span id="brushSizeVal">40</span>
+      </div>
+      <div class="slider-row">
+        <label>ぼかし</label>
+        <input type="range" id="brushBlur" min="0" max="30" value="6" oninput="updateBrush()">
+        <span id="brushBlurVal">6</span>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="showMaskToggle" checked onchange="renderComposite()">
+        <label for="showMaskToggle">マスクをオレンジで表示</label>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== CANVAS AREA ===== -->
+  <div class="canvas-area" id="canvasArea">
+    <div class="canvas-placeholder" id="placeholder">
+      <div class="big-icon">🛋️</div>
+      <p>左パネルからソファ画像をアップロードして<br>作業を開始してください</p>
+    </div>
+    <div class="canvas-wrapper" id="canvasWrapper" style="display:none">
+      <canvas id="mainCanvas"></canvas>
+      <canvas id="overlayCanvas"></canvas>
+    </div>
+  </div>
+
+  <!-- ===== RIGHT PANEL ===== -->
+  <div class="right-panel">
+
+    <!-- 合成設定 -->
+    <div class="panel-section">
+      <div class="panel-label">張地の合成設定</div>
+
+      <div class="slider-row">
+        <label>透明度</label>
+        <input type="range" id="fabricOpacity" min="0" max="100" value="90" oninput="renderComposite()">
+        <span id="fabricOpacityVal">90</span>
+      </div>
+
+      <div class="slider-row">
+        <label>スケール</label>
+        <input type="range" id="fabricScale" min="10" max="300" value="100" oninput="renderComposite()">
+        <span id="fabricScaleVal">100</span>%
+      </div>
+
+      <div class="slider-row">
+        <label>回転</label>
+        <input type="range" id="fabricRotate" min="0" max="360" value="0" oninput="renderComposite()">
+        <span id="fabricRotateVal">0</span>°
+      </div>
+
+      <div class="panel-label" style="margin-top:12px">ブレンドモード</div>
+      <select id="blendMode" onchange="renderComposite()">
+        <option value="source-over">通常</option>
+        <option value="multiply">乗算</option>
+        <option value="screen">スクリーン</option>
+        <option value="overlay">オーバーレイ</option>
+        <option value="soft-light">ソフトライト</option>
+        <option value="hard-light">ハードライト</option>
+        <option value="color">カラー</option>
+        <option value="luminosity">輝度</option>
+      </select>
+    </div>
+
+    <!-- 影設定 -->
+    <div class="panel-section">
+      <div class="panel-label">影・光沢</div>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="enableShadow" onchange="renderComposite()">
+        <label for="enableShadow">エッジに影を追加</label>
+      </div>
+
+      <div class="slider-row">
+        <label>影の強さ</label>
+        <input type="range" id="shadowStrength" min="0" max="100" value="40" oninput="renderComposite()">
+        <span id="shadowStrengthVal">40</span>
+      </div>
+
+      <div class="slider-row">
+        <label>影のぼかし</label>
+        <input type="range" id="shadowBlur" min="0" max="40" value="12" oninput="renderComposite()">
+        <span id="shadowBlurVal">12</span>
+      </div>
+    </div>
+
+    <!-- アクション -->
+    <div class="panel-section">
+      <div class="panel-label">出力</div>
+      <button class="action-btn primary" id="btnApply" onclick="applyFabric()" disabled>
+        ✦ 張地を適用
+      </button>
+      <button class="action-btn secondary" onclick="downloadImage()">
+        ↓ 画像をダウンロード
+      </button>
+      <button class="action-btn secondary" onclick="resetAll()">
+        ↺ 最初からやり直す
+      </button>
+    </div>
+
+    <div class="status-bar" id="statusBar">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">ソファ画像をアップロードして開始</span>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ===== STATE =====
+let sofaImg = null;
+let fabricImg = null;
+let maskCanvas = null;
+let maskCtx = null;
+let isDrawing = false;
+let currentTool = 'brush';
+let lastX = 0, lastY = 0;
+let scale = 1; // canvas display scale
+
+const mainCanvas = document.getElementById('mainCanvas');
+const mainCtx = mainCanvas.getContext('2d');
+const overlayCanvas = document.getElementById('overlayCanvas');
+const overlayCtx = overlayCanvas.getContext('2d');
+
+// ===== UPLOAD HANDLERS =====
+document.getElementById('sofaInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      sofaImg = img;
+      initCanvas();
+      showThumb('sofaUploadZone', ev.target.result);
+      updateStatus();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('fabricInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      fabricImg = img;
+      showThumb('fabricUploadZone', ev.target.result);
+      renderComposite();
+      updateStatus();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+// Drag & drop
+['sofaUploadZone','fabricUploadZone'].forEach(id => {
+  const zone = document.getElementById(id);
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor = 'var(--accent)'; });
+  zone.addEventListener('dragleave', () => { zone.style.borderColor = ''; });
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.style.borderColor = '';
+    const inputId = id === 'sofaUploadZone' ? 'sofaInput' : 'fabricInput';
+    const input = document.getElementById(inputId);
+    const file = e.dataTransfer.files[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change'));
+  });
+});
+
+function showThumb(zoneId, src) {
+  const zone = document.getElementById(zoneId);
+  zone.innerHTML = `<input type="file" id="${zoneId === 'sofaUploadZone' ? 'sofaInput' : 'fabricInput'}" accept="image/*"><img class="preview-thumb" src="${src}">`;
+  zone.classList.add('has-image');
+  // re-attach listener
+  const inputId = zoneId === 'sofaUploadZone' ? 'sofaInput' : 'fabricInput';
+  document.getElementById(inputId).addEventListener('change', zoneId === 'sofaUploadZone'
+    ? e => document.getElementById('sofaInput').dispatchEvent(new Event('change'))
+    : e => document.getElementById('fabricInput').dispatchEvent(new Event('change'))
+  );
+}
+
+// ===== CANVAS INIT =====
+function initCanvas() {
+  const area = document.getElementById('canvasArea');
+  const maxW = area.clientWidth - 40;
+  const maxH = area.clientHeight - 40;
+  scale = Math.min(maxW / sofaImg.width, maxH / sofaImg.height, 1);
+
+  const W = Math.round(sofaImg.width * scale);
+  const H = Math.round(sofaImg.height * scale);
+
+  mainCanvas.width = W;
+  mainCanvas.height = H;
+  overlayCanvas.width = W;
+  overlayCanvas.height = H;
+
+  // mask canvas (same size as original for quality)
+  maskCanvas = document.createElement('canvas');
+  maskCanvas.width = sofaImg.width;
+  maskCanvas.height = sofaImg.height;
+  maskCtx = maskCanvas.getContext('2d');
+
+  document.getElementById('placeholder').style.display = 'none';
+  document.getElementById('canvasWrapper').style.display = 'block';
+
+  renderComposite();
+}
+
+// ===== DRAWING =====
+overlayCanvas.style.pointerEvents = 'auto';
+overlayCanvas.addEventListener('mousedown', startDraw);
+overlayCanvas.addEventListener('mousemove', draw);
+overlayCanvas.addEventListener('mouseup', () => isDrawing = false);
+overlayCanvas.addEventListener('mouseleave', () => isDrawing = false);
+
+// Touch support
+overlayCanvas.addEventListener('touchstart', e => { e.preventDefault(); startDraw(e.touches[0]); }, {passive: false});
+overlayCanvas.addEventListener('touchmove', e => { e.preventDefault(); draw(e.touches[0]); }, {passive: false});
+overlayCanvas.addEventListener('touchend', () => isDrawing = false);
+
+function getPos(e) {
+  const rect = overlayCanvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) / scale,
+    y: (e.clientY - rect.top) / scale
+  };
+}
+
+function startDraw(e) {
+  if (!sofaImg) return;
+  isDrawing = true;
+  const pos = getPos(e);
+  lastX = pos.x; lastY = pos.y;
+  drawStroke(pos.x, pos.y, pos.x, pos.y);
+}
+
+function draw(e) {
+  if (!isDrawing || !sofaImg) return;
+  const pos = getPos(e);
+  drawStroke(lastX, lastY, pos.x, pos.y);
+  lastX = pos.x; lastY = pos.y;
+}
+
+function drawStroke(x1, y1, x2, y2) {
+  const size = parseInt(document.getElementById('brushSize').value);
+  const blur = parseInt(document.getElementById('brushBlur').value);
+
+  maskCtx.save();
+  maskCtx.lineCap = 'round';
+  maskCtx.lineJoin = 'round';
+  maskCtx.lineWidth = size;
+
+  if (currentTool === 'brush') {
+    if (blur > 0) {
+      maskCtx.filter = `blur(${blur}px)`;
+    }
+    maskCtx.globalCompositeOperation = 'source-over';
+    maskCtx.strokeStyle = 'white';
+  } else {
+    maskCtx.filter = blur > 0 ? `blur(${blur}px)` : 'none';
+    maskCtx.globalCompositeOperation = 'destination-out';
+    maskCtx.strokeStyle = 'black';
+    maskCtx.lineWidth = size * 1.5;
+  }
+
+  maskCtx.beginPath();
+  maskCtx.moveTo(x1, y1);
+  maskCtx.lineTo(x2, y2);
+  maskCtx.stroke();
+  maskCtx.restore();
+
+  renderComposite();
+  updateApplyBtn();
+}
+
+function clearMask() {
+  if (!maskCtx) return;
+  maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+  renderComposite();
+  updateApplyBtn();
+}
+
+// ===== RENDER =====
+function renderComposite() {
+  if (!sofaImg) return;
+  const W = mainCanvas.width;
+  const H = mainCanvas.height;
+
+  // Draw base sofa
+  mainCtx.clearRect(0, 0, W, H);
+  mainCtx.drawImage(sofaImg, 0, 0, W, H);
+
+  // Draw fabric on masked area
+  if (fabricImg && maskCanvas) {
+    const fabricOpacity = parseInt(document.getElementById('fabricOpacity').value) / 100;
+    const fabricScale = parseInt(document.getElementById('fabricScale').value) / 100;
+    const fabricRotate = parseInt(document.getElementById('fabricRotate').value) * Math.PI / 180;
+    const blendMode = document.getElementById('blendMode').value;
+
+    // Create temp canvas for fabric pattern
+    const tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width = W;
+    tmpCanvas.height = H;
+    const tmpCtx = tmpCanvas.getContext('2d');
+
+    // Tile fabric with scale/rotation
+    const fw = fabricImg.width * fabricScale;
+    const fh = fabricImg.height * fabricScale;
+
+    if (fabricRotate !== 0) {
+      tmpCtx.save();
+      tmpCtx.translate(W/2, H/2);
+      tmpCtx.rotate(fabricRotate);
+      tmpCtx.translate(-W/2, -H/2);
+    }
+
+    // Create pattern
+    const patCanvas = document.createElement('canvas');
+    patCanvas.width = fw;
+    patCanvas.height = fh;
+    const patCtx = patCanvas.getContext('2d');
+    patCtx.drawImage(fabricImg, 0, 0, fw, fh);
+    const pattern = tmpCtx.createPattern(patCanvas, 'repeat');
+    tmpCtx.fillStyle = pattern;
+    tmpCtx.fillRect(-W, -H, W*3, H*3);
+
+    if (fabricRotate !== 0) tmpCtx.restore();
+
+    // Apply mask
+    tmpCtx.globalCompositeOperation = 'destination-in';
+    tmpCtx.drawImage(maskCanvas, 0, 0, W, H);
+
+    // Shadow effect on mask edge
+    if (document.getElementById('enableShadow').checked) {
+      const shadowStrength = parseInt(document.getElementById('shadowStrength').value) / 100;
+      const shadowBlur = parseInt(document.getElementById('shadowBlur').value);
+      const shadowCanvas = document.createElement('canvas');
+      shadowCanvas.width = W;
+      shadowCanvas.height = H;
+      const shadowCtx = shadowCanvas.getContext('2d');
+
+      shadowCtx.filter = `blur(${shadowBlur}px)`;
+      shadowCtx.drawImage(maskCanvas, 0, 0, W, H);
+      shadowCtx.filter = 'none';
+
+      // Use as shadow layer
+      mainCtx.save();
+      mainCtx.globalAlpha = shadowStrength * 0.7;
+      mainCtx.globalCompositeOperation = 'multiply';
+      mainCtx.drawImage(shadowCanvas, 2, 3);
+      mainCtx.restore();
+    }
+
+    // Composite fabric onto main
+    mainCtx.save();
+    mainCtx.globalAlpha = fabricOpacity;
+    mainCtx.globalCompositeOperation = blendMode;
+    mainCtx.drawImage(tmpCanvas, 0, 0);
+    mainCtx.restore();
+
+    // Update slider displays
+    document.getElementById('fabricOpacityVal').textContent = document.getElementById('fabricOpacity').value;
+    document.getElementById('fabricScaleVal').textContent = document.getElementById('fabricScale').value;
+    document.getElementById('fabricRotateVal').textContent = document.getElementById('fabricRotate').value;
+    document.getElementById('shadowStrengthVal').textContent = document.getElementById('shadowStrength').value;
+    document.getElementById('shadowBlurVal').textContent = document.getElementById('shadowBlur').value;
+  }
+
+  // Overlay: show mask in orange
+  overlayCtx.clearRect(0, 0, W, H);
+  if (document.getElementById('showMaskToggle').checked && maskCanvas) {
+    overlayCtx.save();
+    overlayCtx.globalAlpha = 0.38;
+    overlayCtx.fillStyle = '#ff8c00';
+    overlayCtx.fillRect(0, 0, W, H);
+    overlayCtx.globalCompositeOperation = 'destination-in';
+    overlayCtx.drawImage(maskCanvas, 0, 0, W, H);
+    overlayCtx.restore();
+  }
+}
+
+// ===== TOOL =====
+function setTool(tool) {
+  currentTool = tool;
+  document.getElementById('btnBrush').classList.toggle('active', tool === 'brush');
+  document.getElementById('btnEraser').classList.toggle('active', tool === 'eraser');
+  document.getElementById('btnEraser').classList.toggle('danger', tool === 'eraser');
+}
+
+function updateBrush() {
+  document.getElementById('brushSizeVal').textContent = document.getElementById('brushSize').value;
+  document.getElementById('brushBlurVal').textContent = document.getElementById('brushBlur').value;
+}
+
+// ===== APPLY (flatten) =====
+function applyFabric() {
+  renderComposite();
+  // snapshot: hide mask overlay, capture, done
+  overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  setStatus('ready', '張地を適用しました！ダウンロードできます');
+}
+
+function downloadImage() {
+  if (!sofaImg) return;
+  overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  const link = document.createElement('a');
+  link.download = 'sofa_refabric.png';
+  link.href = mainCanvas.toDataURL('image/png');
+  link.click();
+  setStatus('ready', 'ダウンロードしました！');
+}
+
+function resetAll() {
+  sofaImg = null;
+  fabricImg = null;
+  if (maskCtx) maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+  mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+  overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  document.getElementById('canvasWrapper').style.display = 'none';
+  document.getElementById('placeholder').style.display = 'flex';
+
+  // Reset upload zones
+  document.getElementById('sofaUploadZone').innerHTML = `<input type="file" id="sofaInput" accept="image/*"><span class="upload-icon">🛋️</span><div class="upload-hint">クリックまたはドロップ<br>JPG / PNG</div>`;
+  document.getElementById('sofaUploadZone').classList.remove('has-image');
+  document.getElementById('fabricUploadZone').innerHTML = `<input type="file" id="fabricInput" accept="image/*"><span class="upload-icon">🪡</span><div class="upload-hint">クリックまたはドロップ<br>JPG / PNG</div>`;
+  document.getElementById('fabricUploadZone').classList.remove('has-image');
+  // Re-attach listeners
+  document.getElementById('sofaInput').addEventListener('change', e => document.getElementById('sofaInput').dispatchEvent(new Event('change')));
+  document.getElementById('fabricInput').addEventListener('change', e => document.getElementById('fabricInput').dispatchEvent(new Event('change')));
+  location.reload(); // simplest reset
+}
+
+// ===== STATUS =====
+function updateStatus() {
+  if (!sofaImg) {
+    setStatus('', 'ソファ画像をアップロードして開始');
+  } else if (!fabricImg) {
+    setStatus('warn', 'ソファ✓ — 次に張地テクスチャをアップロード');
+  } else {
+    setStatus('warn', 'ブラシで張地部分を塗りつぶしてください');
+  }
+  updateApplyBtn();
+}
+
+function updateApplyBtn() {
+  const hasMask = maskCanvas && (() => {
+    const d = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height).data;
+    for (let i = 3; i < d.length; i += 4) if (d[i] > 0) return true;
+    return false;
+  })();
+  document.getElementById('btnApply').disabled = !(sofaImg && fabricImg && hasMask);
+}
+
+function setStatus(type, msg) {
+  document.getElementById('statusDot').className = 'status-dot' + (type ? ' ' + type : '');
+  document.getElementById('statusText').textContent = msg;
+}
+
+// Init slider displays
+updateBrush();
+</script>
+</body>
+</html>
