@@ -340,12 +340,17 @@ select {
       <div style="margin-top:8px">
         <select id="blendMode" onchange="renderComposite()">
           <option value="source-over">通常</option>
-          <option value="multiply">乗算</option>
+          <option value="hue">色相（色だけ変える★）</option>
+          <option value="color">カラー（色＋彩度）</option>
+          <option value="multiply">乗算（影が残る）</option>
           <option value="screen">スクリーン</option>
           <option value="overlay">オーバーレイ</option>
           <option value="soft-light">ソフトライト</option>
-          <option value="color">カラー</option>
+          <option value="luminosity">輝度</option>
         </select>
+        <div style="font-size:.62rem;color:var(--text-dim);line-height:1.5;margin-top:6px">
+          ★色付きソファには「色相」か「カラー」がおすすめ
+        </div>
       </div>
     </div>
 
@@ -528,7 +533,13 @@ function getPinchDist(e) {
 
 function getPos(e) {
   const rect=overlayCanvas.getBoundingClientRect();
-  return { x:(e.clientX-rect.left)/canvasScale, y:(e.clientY-rect.top)/canvasScale };
+  // rect.widthはCSSピクセル幅、canvasの実ピクセル幅と比較してスケールを正確に計算
+  const scaleX = mainCanvas.width / rect.width;
+  const scaleY = mainCanvas.height / rect.height;
+  return {
+    x: (e.clientX - rect.left) * scaleX / canvasScale,
+    y: (e.clientY - rect.top)  * scaleY / canvasScale
+  };
 }
 
 function moveCursor(e) {
@@ -779,7 +790,7 @@ function setStatus(type,msg){
 }
 
 // ===== DRAWER =====
-const BLEND_LABELS={'source-over':'通常','multiply':'乗算','screen':'スクリーン','overlay':'オーバーレイ','soft-light':'ソフトライト','color':'カラー'};
+const BLEND_LABELS={'source-over':'通常','hue':'色相（色だけ変える★）','color':'カラー（色＋彩度）','multiply':'乗算（影が残る）','screen':'スクリーン','overlay':'オーバーレイ','soft-light':'ソフトライト','luminosity':'輝度'};
 
 function openDrawer(type){
   const titles={brush:'ブラシ設定',fabric:'張地の合成設定',edge:'自動検出の感度'};
