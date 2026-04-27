@@ -883,32 +883,14 @@ function updateKreaBtn(){
   if(b) b.disabled=!ok;
 }
 
-// 画像をblobとしてKreaにアップロードしURLを取得
-async function uploadImageToKrea(img, maxSize=1024){
+// 画像をbase64データURLに変換
+function imgToDataUrl(img, maxSize=1024){
   const c=document.createElement('canvas');
   const scale=Math.min(maxSize/img.width, maxSize/img.height, 1);
   c.width=Math.round(img.width*scale);
   c.height=Math.round(img.height*scale);
   c.getContext('2d').drawImage(img,0,0,c.width,c.height);
-  return new Promise((resolve,reject)=>{
-    c.toBlob(async blob=>{
-      try{
-        const fd=new FormData();
-        fd.append('file', blob, 'image.jpg');
-        const res=await fetch('https://api.krea.ai/assets/upload',{
-          method:'POST',
-          headers:{'Authorization':`Bearer ${kreaApiKey}`},
-          body:fd
-        });
-        if(!res.ok){
-          const e=await res.json();
-          throw new Error(e.message||`アップロードエラー: ${res.status}`);
-        }
-        const data=await res.json();
-        resolve(data.url||data.asset_url||data.file_url||data.data?.url);
-      }catch(e){reject(e);}
-    },'image/jpeg',0.9);
-  });
+  return c.toDataURL('image/jpeg',0.9);
 }
 
 async function runKreaAI(){
@@ -916,20 +898,16 @@ async function runKreaAI(){
   if(!sofaImg||!fabricImg){alert('ソファ画像と張地画像の両方をアップロードしてください');return;}
 
   const ov=document.getElementById('processingOverlay');
-  document.getElementById('processingText').textContent='画像をアップロード中...';
+  document.getElementById('processingText').textContent='AIが張地を変換中... (20〜40秒)';
   ov.classList.add('show');
 
   try{
-    // 両画像をKreaにアップロード
-    document.getElementById('processingText').textContent='ソファ画像をアップロード中...';
-    const sofaUrl=await uploadImageToKrea(sofaImg,1024);
-    document.getElementById('processingText').textContent='張地画像をアップロード中...';
-    const fabricUrl=await uploadImageToKrea(fabricImg,512);
+    // base64データURLをそのまま渡す
+    const sofaDataUrl=imgToDataUrl(sofaImg,1024);
+    const fabricDataUrl=imgToDataUrl(fabricImg,512);
 
     const model=document.getElementById('kreaModel')?.value||'bfl/flux-1-dev-kontext';
     const prompt=`Replace ONLY the fabric/upholstery cushion parts of the sofa in the first image with the exact color, pattern, and texture shown in the second image. Keep the sofa frame, legs, and wooden parts exactly unchanged. Preserve all shadows, seams, wrinkles, and cushion boundaries. Keep the background and room exactly the same. The result should look photorealistic.`;
-
-    document.getElementById('processingText').textContent='AIが張地を変換中... (20〜40秒)';
 
     // ジョブ開始
     const endpoint=`https://api.krea.ai/generate/image/${model}`;
@@ -938,7 +916,7 @@ async function runKreaAI(){
       headers:{'Authorization':`Bearer ${kreaApiKey}`,'Content-Type':'application/json'},
       body:JSON.stringify({
         prompt,
-        imageUrls:[sofaUrl, fabricUrl]
+        imageUrls:[sofaDataUrl, fabricDataUrl]
       })
     });
 
@@ -963,7 +941,7 @@ async function runKreaAI(){
       const pollData=await pollRes.json();
 
       if(pollData.status==='completed'||pollData.status==='success'){
-        const imageUrl=pollData.result?.url||pollData.result?.images?.[0]||pollData.output?.url;
+        const imageUrl=pollData.result?.urls?.[0]||pollData.result?.url||pollData.result?.images?.[0]||pollData.output?.url;
         if(!imageUrl) throw new Error('結果画像URLが見つかりませんでした');
 
         // 結果画像をcanvasに表示
