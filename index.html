@@ -372,13 +372,13 @@ select {
       </div>
     </div>
 
-    <div class="panel-section" id="geminiSection">
-      <div class="panel-label">🤖 AI張地変換（Gemini）</div>
+    <div class="panel-section" id="kreaSection">
+      <div class="panel-label">🤖 AI張地変換（Krea）</div>
       <div style="font-size:.64rem;color:var(--text-dim);line-height:1.6;margin-bottom:8px">
         ソファ画像と張地画像をアップロードして<br>ボタン一つでAIが自動合成します
       </div>
       <div id="apiKeyArea">
-        <input type="password" id="geminiApiKey" placeholder="Gemini APIキーを入力" style="
+        <input type="password" id="kreaApiKey" placeholder="Krea APIキーを入力" style="
           width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);
           color:var(--text);border-radius:4px;font-size:.74rem;margin-bottom:6px;
         ">
@@ -387,7 +387,14 @@ select {
       <div id="apiKeySet" style="display:none;font-size:.68rem;color:var(--success);margin-bottom:8px">
         ✓ APIキー設定済み　<span style="color:var(--text-dim);cursor:pointer;text-decoration:underline" onclick="clearApiKey()">変更</span>
       </div>
-      <button class="action-btn primary" id="btnGemini" onclick="runGeminiAI()" style="background:linear-gradient(135deg,#4285f4,#0f9d58);margin-bottom:0" disabled>
+      <div style="margin-bottom:8px;margin-top:4px">
+        <select id="kreaModel" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:4px;font-size:.72rem;width:100%">
+          <option value="bfl/flux-1-dev-kontext">Flux Kontext（無料枠）</option>
+          <option value="google/nano-banana-2">Nano Banana 2（高品質）</option>
+          <option value="qwen/qwen-edit-plus">Qwen Edit Plus（高品質）</option>
+        </select>
+      </div>
+      <button class="action-btn primary" id="btnKrea" onclick="runKreaAI()" style="background:linear-gradient(135deg,#7c3aed,#c026d3);margin-bottom:0" disabled>
         ✨ AIで張地を変換
       </button>
     </div>
@@ -445,7 +452,7 @@ let sofaImg=null, fabricImg=null, maskCanvas=null, maskCtx=null;
 let isDrawing=false, currentTool='brush', lastX=0, lastY=0;
 let canvasScale=1, viewZoom=1, viewOffX=0, viewOffY=0;
 let isPinching=false, pinchDist=0, pinchCx=0, pinchCy=0;
-let geminiApiKey = sessionStorage.getItem('geminiApiKey') || '';
+let kreaApiKey = sessionStorage.getItem('kreaApiKey') || '';
 
 const mainCanvas=document.getElementById('mainCanvas');
 const mainCtx=mainCanvas.getContext('2d');
@@ -849,7 +856,150 @@ function applyAndDownload(){
   },50);
 }
 
-// ===== GEMINI API =====
+// ===== KREA API =====
+function saveApiKey(){
+  const key=document.getElementById('kreaApiKey').value.trim();
+  if(!key){alert('APIキーを入力してください');return;}
+  kreaApiKey=key;
+  sessionStorage.setItem('kreaApiKey',key);
+  document.getElementById('apiKeyArea').style.display='none';
+  document.getElementById('apiKeySet').style.display='block';
+  updateKreaBtn();
+  setStatus('ready','APIキーを設定しました！');
+}
+
+function clearApiKey(){
+  kreaApiKey='';
+  sessionStorage.removeItem('kreaApiKey');
+  document.getElementById('apiKeyArea').style.display='block';
+  document.getElementById('apiKeySet').style.display='none';
+  document.getElementById('kreaApiKey').value='';
+  updateKreaBtn();
+}
+
+function updateKreaBtn(){
+  const ok=!!(kreaApiKey&&sofaImg&&fabricImg);
+  const b=document.getElementById('btnKrea');
+  if(b) b.disabled=!ok;
+}
+
+// 画像をblobとしてKreaにアップロードしURLを取得
+async function uploadImageToKrea(img, maxSize=1024){
+  const c=document.createElement('canvas');
+  const scale=Math.min(maxSize/img.width, maxSize/img.height, 1);
+  c.width=Math.round(img.width*scale);
+  c.height=Math.round(img.height*scale);
+  c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+  return new Promise((resolve,reject)=>{
+    c.toBlob(async blob=>{
+      try{
+        const fd=new FormData();
+        fd.append('file', blob, 'image.jpg');
+        const res=await fetch('https://api.krea.ai/assets/upload',{
+          method:'POST',
+          headers:{'Authorization':`Bearer ${kreaApiKey}`},
+          body:fd
+        });
+        if(!res.ok){
+          const e=await res.json();
+          throw new Error(e.message||`アップロードエラー: ${res.status}`);
+        }
+        const data=await res.json();
+        resolve(data.url||data.asset_url||data.file_url||data.data?.url);
+      }catch(e){reject(e);}
+    },'image/jpeg',0.9);
+  });
+}
+
+async function runKreaAI(){
+  if(!kreaApiKey){alert('APIキーを設定してください');return;}
+  if(!sofaImg||!fabricImg){alert('ソファ画像と張地画像の両方をアップロードしてください');return;}
+
+  const ov=document.getElementById('processingOverlay');
+  document.getElementById('processingText').textContent='画像をアップロード中...';
+  ov.classList.add('show');
+
+  try{
+    // 両画像をKreaにアップロード
+    document.getElementById('processingText').textContent='ソファ画像をアップロード中...';
+    const sofaUrl=await uploadImageToKrea(sofaImg,1024);
+    document.getElementById('processingText').textContent='張地画像をアップロード中...';
+    const fabricUrl=await uploadImageToKrea(fabricImg,512);
+
+    const model=document.getElementById('kreaModel')?.value||'bfl/flux-1-dev-kontext';
+    const prompt=`Replace ONLY the fabric/upholstery cushion parts of the sofa in the first image with the exact color, pattern, and texture shown in the second image. Keep the sofa frame, legs, and wooden parts exactly unchanged. Preserve all shadows, seams, wrinkles, and cushion boundaries. Keep the background and room exactly the same. The result should look photorealistic.`;
+
+    document.getElementById('processingText').textContent='AIが張地を変換中... (20〜40秒)';
+
+    // ジョブ開始
+    const endpoint=`https://api.krea.ai/generate/image/${model}`;
+    const jobRes=await fetch(endpoint,{
+      method:'POST',
+      headers:{'Authorization':`Bearer ${kreaApiKey}`,'Content-Type':'application/json'},
+      body:JSON.stringify({
+        prompt,
+        imageUrls:[sofaUrl, fabricUrl]
+      })
+    });
+
+    if(!jobRes.ok){
+      const e=await jobRes.json();
+      throw new Error(e.message||e.error||`APIエラー: ${jobRes.status}`);
+    }
+
+    const jobData=await jobRes.json();
+    const jobId=jobData.job_id||jobData.id;
+    if(!jobId) throw new Error('ジョブIDが取得できませんでした');
+
+    // ポーリング（2秒ごと・最大60回=2分）
+    for(let i=0;i<60;i++){
+      await new Promise(r=>setTimeout(r,2000));
+      document.getElementById('processingText').textContent=`AI処理中... (${(i+1)*2}秒)`;
+
+      const pollRes=await fetch(`https://api.krea.ai/jobs/${jobId}`,{
+        headers:{'Authorization':`Bearer ${kreaApiKey}`}
+      });
+      if(!pollRes.ok) continue;
+      const pollData=await pollRes.json();
+
+      if(pollData.status==='completed'||pollData.status==='success'){
+        const imageUrl=pollData.result?.url||pollData.result?.images?.[0]||pollData.output?.url;
+        if(!imageUrl) throw new Error('結果画像URLが見つかりませんでした');
+
+        // 結果画像をcanvasに表示
+        const resultImg=new Image();
+        resultImg.crossOrigin='anonymous';
+        resultImg.onload=()=>{
+          sofaImg=resultImg;
+          initCanvas();
+          setStatus('ready','AI変換完了！ダウンロードできます');
+          document.getElementById('btnApply').disabled=false;
+        };
+        resultImg.onerror=()=>{
+          // CORSエラーの場合は直接URLを表示
+          setStatus('ready','AI変換完了！');
+          alert(`変換完了！画像を以下のURLで確認してください:\n${imageUrl}`);
+        };
+        resultImg.src=imageUrl;
+        return;
+      }
+
+      if(pollData.status==='failed'||pollData.status==='error'){
+        throw new Error(pollData.error||'AI処理が失敗しました');
+      }
+    }
+    throw new Error('タイムアウト：処理に時間がかかりすぎています');
+
+  } catch(e){
+    console.error(e);
+    alert(`エラーが発生しました:\n${e.message}`);
+    setStatus('','エラーが発生しました');
+  } finally{
+    ov.classList.remove('show');
+  }
+}
+
+// ===== GEMINI API (旧・無効) =====
 function saveApiKey(){
   const key=document.getElementById('geminiApiKey').value.trim();
   if(!key){alert('APIキーを入力してください');return;}
@@ -857,7 +1007,7 @@ function saveApiKey(){
   sessionStorage.setItem('geminiApiKey',key);
   document.getElementById('apiKeyArea').style.display='none';
   document.getElementById('apiKeySet').style.display='block';
-  updateGeminiBtn();
+  updateKreaBtn();
   setStatus('ready','APIキーを設定しました！');
 }
 
@@ -867,10 +1017,10 @@ function clearApiKey(){
   document.getElementById('apiKeyArea').style.display='block';
   document.getElementById('apiKeySet').style.display='none';
   document.getElementById('geminiApiKey').value='';
-  updateGeminiBtn();
+  updateKreaBtn();
 }
 
-function updateGeminiBtn(){
+function _oldUpdateGeminiBtn_unused(){
   const ok=!!(geminiApiKey&&sofaImg&&fabricImg);
   const b=document.getElementById('btnGemini');
   if(b) b.disabled=!ok;
@@ -886,7 +1036,7 @@ function imgToBase64(img, maxSize=1024){
   return dataUrl.split(',')[1]; // base64のみ返す
 }
 
-async function runGeminiAI(){
+async function runKreaAI(){
   if(!geminiApiKey){alert('APIキーを設定してください');return;}
   if(!sofaImg||!fabricImg){alert('ソファ画像と張地画像の両方をアップロードしてください');return;}
 
@@ -977,7 +1127,7 @@ function updateStatus(){
   else if(!fabricImg) setStatus('warn','ソファ✓ — 次に張地テクスチャをアップロード');
   else setStatus('warn','🤖AI変換、またはブラシで手動マスクしてください');
   updateApplyBtn();
-  updateGeminiBtn();
+  updateKreaBtn();
 }
 function updateApplyBtn(){
   const ok=sofaImg&&fabricImg&&maskCanvas&&(()=>{
@@ -1012,9 +1162,9 @@ function openDrawer(type){
         : `<input type="password" id="d_apikey" placeholder="AIzaSy..." style="
             width:100%;padding:10px;background:var(--surface2);border:1px solid var(--border);
             color:var(--text);border-radius:4px;font-size:.8rem;margin-bottom:8px;">
-           <button class="action-btn secondary" onclick="document.getElementById('geminiApiKey').value=document.getElementById('d_apikey').value;saveApiKey();closeDrawer()" style="margin-bottom:12px">🔑 キーを保存</button>`
+           <button class="action-btn secondary" onclick="document.getElementById('kreaApiKey').value=document.getElementById('d_apikey').value;saveApiKey();closeDrawer()" style="margin-bottom:12px">🔑 キーを保存</button>`
       }
-      <button class="action-btn primary" onclick="closeDrawer();setTimeout(runGeminiAI,100)" style="background:linear-gradient(135deg,#4285f4,#0f9d58)" ${(!sofaImg||!fabricImg||!geminiApiKey)?'disabled':''}>
+      <button class="action-btn primary" onclick="closeDrawer();setTimeout(runKreaAI,100)" style="background:linear-gradient(135deg,#4285f4,#0f9d58)" ${(!sofaImg||!fabricImg||!geminiApiKey)?'disabled':''}>
         ✨ AIで張地を変換
       </button>
       <div style="height:20px"></div>`;
